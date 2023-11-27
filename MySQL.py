@@ -8,9 +8,35 @@ def create_connection(host, user, password, database):
             host=host,
             user=user,
             password=password,
-            database=database
         )
         if connection.is_connected():
+            cursor = connection.cursor()
+
+            # Create the database if it doesn't exist
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {database}")
+
+            # Switch to the specified database
+            cursor.execute(f"USE {database}")
+
+            # Create the 'first' table if it doesn't exist
+            create_table_query = """
+                CREATE TABLE IF NOT EXISTS first ( 
+                    rental_id INT,
+                    duration INT,
+                    bike_id INT,
+                    end_rental_date_time DATETIME,
+                    end_station_id INT,
+                    end_station_name VARCHAR(255),
+                    start_rental_date_time DATETIME,
+                    start_station_id INT,
+                    start_station_name VARCHAR(255),
+                    PRIMARY KEY (rental_id)
+                )
+            """
+    
+
+            cursor.execute(create_table_query)
+
             print(f"Connected to MySQL Database: {database}")
             return connection
     except Error as e:
@@ -40,63 +66,23 @@ def import_data_from_csv(connection, csv_file_path, table_name):
         if cursor:
             cursor.close()
 
-def delete_data(connection, table_name, condition):
-    try:
-        cursor = connection.cursor()
-        query = f"DELETE FROM {table_name} WHERE {condition}"
-        cursor.execute(query)
-        connection.commit()
-        print(f"Data deleted from table: {table_name}")
-
-    except Error as e:
-        print(f"Error deleting data: {e}")
-
-    finally:
-        if cursor:
-            cursor.close()
-
-def update_data(connection, table_name, update_values, condition):
-    try:
-        cursor = connection.cursor()
-        set_clause = ', '.join([f"{column} = %s" for column in update_values.keys()])
-        query = f"UPDATE {table_name} SET {set_clause} WHERE {condition}"
-        cursor.execute(query, list(update_values.values()))
-        connection.commit()
-        print(f"Data updated in table: {table_name}")
-
-    except Error as e:
-        print(f"Error updating data: {e}")
-
-    finally:
-        if cursor:
-            cursor.close()
-
 if __name__ == "__main__":
     # Replace these values with your MySQL server credentials
     host = "localhost"
-    user = "your_username"
-    password = "your_password"
-    database = "your_database"
-    
-    # Replace these values with your CSV file path and table name
-    csv_file_path = "path/to/your/file.csv"
-    table_name = "your_table"
+    user = "root"
+    password = ""
+    database = "Project1"
 
-    # Create a connection to MySQL
+    # Replace these values with your CSV file path and table name
+    csv_file_path = "london.csv"
+    table_name = "first"
+
+    # Create a connection to MySQL, create the database and 'first' table if they don't exist
     connection = create_connection(host, user, password, database)
 
     if connection:
         # Import data from CSV into MySQL
         import_data_from_csv(connection, csv_file_path, table_name)
-
-        # Delete data from table
-        delete_condition = "column_name = 'some_value'"  # Replace with your actual condition
-        delete_data(connection, table_name, delete_condition)
-
-        # Update data in table
-        update_values = {"column_name": "new_value"}  # Replace with your actual update values
-        update_condition = "another_column = 'some_value'"  # Replace with your actual condition
-        update_data(connection, table_name, update_values, update_condition)
 
         # Close the connection
         connection.close()
