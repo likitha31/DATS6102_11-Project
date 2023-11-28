@@ -1,78 +1,152 @@
-# python import_data_mongodb.py
-# pip install pymongo
 import csv
 from pymongo import MongoClient
 
-def create_mongo_connection(host, port, username, password, database):
+def create_connection():
     try:
-        client = MongoClient(host=host, port=port, username=username, password=password)
-        db = client[database]
-        print(f"Connected to MongoDB Database: {database}")
-        return db
+        # Connect to the MongoDB server
+        client = MongoClient('mongodb://localhost:27017/')
+
+        # Create or get the database
+        database = client['Project1']
+
+        # Create or get the collection (equivalent to table in MongoDB)
+        collection = database['first']
+
+        print("Connected to MongoDB Database: Project1")
+        print("Collection created")
+
+        return collection
+
     except Exception as e:
         print(f"Error: {e}")
         return None
 
-def import_data_from_csv(mongo_db, collection_name, csv_file_path):
+def import_data_from_csv(collection, csv_file_path):
     try:
-        collection = mongo_db[collection_name]
-
         with open(csv_file_path, 'r') as csv_file:
             csv_reader = csv.DictReader(csv_file)
-            csv_data = list(csv_reader)
 
-            # Insert the CSV data into MongoDB
-            result = collection.insert_many(csv_data)
-            print(f"Data imported into collection: {collection_name}. Inserted {len(result.inserted_ids)} documents.")
+            print("Inserting data")
+
+            # Insert each row as a document in the collection
+            for row in csv_reader:
+                collection.insert_one(row)
+
+        print("Data imported into collection")
 
     except Exception as e:
         print(f"Error importing data: {e}")
 
-def delete_data(mongo_db, collection_name, delete_condition):
+def delete_data(collection, condition):
     try:
-        collection = mongo_db[collection_name]
-        result = collection.delete_many(delete_condition)
-        print(f"Data deleted from collection: {collection_name}. Deleted {result.deleted_count} documents.")
+        # Delete documents that match the specified condition
+        collection.delete_many(condition)
+        print("Data deleted from collection")
 
     except Exception as e:
         print(f"Error deleting data: {e}")
 
-def update_data(mongo_db, collection_name, update_condition, update_values):
+def update_data(collection, update_values, condition):
     try:
-        collection = mongo_db[collection_name]
-        result = collection.update_many(update_condition, {"$set": update_values})
-        print(f"Data updated in collection: {collection_name}. Matched {result.matched_count} documents, modified {result.modified_count} documents.")
+        # Update documents that match the specified condition
+        collection.update_many(condition, {"$set": update_values})
+        print("Data updated in collection")
 
     except Exception as e:
         print(f"Error updating data: {e}")
 
+def insert_data(collection, values):
+    try:
+        # Insert a new document into the collection
+        collection.insert_one(values)
+        print("Data inserted into collection")
+
+    except Exception as e:
+        print(f"Error inserting data: {e}")
+
+def perform_aggregate_query(collection, make):
+    try:
+        # Aggregate pipeline to find the maximum and minimum sale price for the given make
+        pipeline = [
+            {"$match": {"Make": make}},
+            {"$group": {"_id": None, "max_sale_price": {"$max": "$Sale_Price"}, "min_sale_price": {"$min": "$Sale_Price"}}}
+        ]
+
+        result = list(collection.aggregate(pipeline))
+
+        if result:
+            max_sale_price = result[0]["max_sale_price"] if result[0]["max_sale_price"] is not None else 0
+            min_sale_price = result[0]["min_sale_price"] if result[0]["min_sale_price"] is not None else 0
+
+            print(f"Statistics for {make}:")
+            print(f"Maximum Sale Price: {max_sale_price}")
+            print(f"Minimum Sale Price: {min_sale_price}")
+        else:
+            print(f"No data found for {make}")
+
+    except Exception as e:
+        print(f"Error finding sale price stats: {e}")
+
+def perform_complex_query(collection, limit_value=10):
+    try:
+        # Query to select specific fields and apply conditions with LIMIT
+        query = [
+            {"$match": {
+                "Clean_Alternative_Fuel_Vehicle_Type": "Battery Electric Vehicle (BEV)",
+                "Model_Year": {"$gte": 2020},
+                "Sale_Price": {"$gt": 25000},
+                "State_of_Residence": "WA"
+            }},
+            {"$group": {
+                "_id": "$Make",
+                "VehicleCount": {"$sum": 1},
+                "AvgSalePrice": {"$avg": "$Sale_Price"}
+            }},
+            {"$sort": {"AvgSalePrice": -1}},
+            {"$limit": limit_value}
+        ]
+
+        result = list(collection.aggregate(query))
+
+        # Print the results
+        print(f"Results of the query with LIMIT: {limit_value}:")
+        for row in result:
+            print(row)
+
+    except Exception as e:
+        print(f"Error performing complex query: {e}")
+
 if __name__ == "__main__":
-    # Replace these values with your MongoDB connection details
-    mongodb_host = "localhost"
-    mongodb_port = 27017
-    mongodb_username = "your_username"
-    mongodb_password = "your_password"
-    mongodb_database = "your_database"
+    # Replace these values with your CSV file path
+    csv_file_path = "Electric_Vehicle_Title_and_Registration_Activity.csv"
 
-    # Replace these values with your CSV file path and MongoDB collection name
-    csv_file_path = "path/to/your/file.csv"
-    mongodb_collection = "your_collection"
+    # Create a connection to MongoDB, create the database and 'first' collection if they don't exist
+    collection = create_connection()
 
-    # Create a connection to MongoDB
-    mongo_db = create_mongo_connection(mongodb_host, mongodb_port, mongodb_username, mongodb_password, mongodb_database)
-
-    if mongo_db:
+    if collection:
         # Import data from CSV into MongoDB
-        import_data_from_csv(mongo_db, mongodb_collection, csv_file_path)
+        
+        import_data_from_csv(collection, csv_file_path)
 
-        # Delete data from MongoDB collection
-        delete_condition = {"your_field": "your_value"}  # Replace with your actual condition
-        delete_data(mongo_db, mongodb_collection, delete_condition)
+        # Delete data from collection
+        delete_condition = {"ID": 6}  # Replace with your actual condition
+        delete_data(collection, delete_condition)
 
-        # Update data in MongoDB collection
-        update_condition = {"your_field": "your_value"}  # Replace with your actual condition
-        update_values = {"$set": {"field_to_update": "new_value"}}  # Replace with your actual update values
-        update_data(mongo_db, mongodb_collection, update_condition, update_values)
+        # Update data in collection
+        update_values = {"Postal_Code": 98036}  # Replace with your actual update values
+        update_condition = {"Postal_Code": 98034}  # Replace with your actual condition
+        update_data(collection, update_values, update_condition)
+        
+        new_values = {
+            "ID": 6,
+            "Clean_Alternative_Fuel_Vehicle_Type": "Electric",
+            "VIN": "ABC123",
+            # Add other fields here...
+            "Electric_Utility": "Power Company"
+        }
+        insert_data(collection, new_values)
+        
 
-        # Close the MongoDB connection
-        mongo_db.client.close()
+        perform_aggregate_query(collection, "Tesla")
+
+        perform_complex_query(collection, limit_value=5)
