@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 
 # %%
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "likiK**31"))
-graph = Graph("bolt://localhost:7687", auth=("neo4j", "likiK**31"))
+driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+graph = Graph("bolt://localhost:7687", auth=("neo4j", "password"))
 
 # %%
 with driver.session(database='neo4j') as session:
